@@ -57,11 +57,16 @@ mkdir -p /var/www/certbot
 if [ ! -d "/etc/letsencrypt/live/$DOMAIN" ]; then
   certbot certonly --standalone -d "$DOMAIN" -m "$EMAIL" --agree-tos -n
 fi
+# نسخ الشهادة لمجلد يقرأه nginx (بدون روابط رمزية)
+install -d -m 700 /etc/sumer-certs
+cp -L "/etc/letsencrypt/live/$DOMAIN/fullchain.pem" "/etc/letsencrypt/live/$DOMAIN/privkey.pem" /etc/sumer-certs/
+chmod 600 /etc/sumer-certs/*.pem
 # التجديد التلقائي: certbot يجدد عبر مجلد التحدي، وبعدها نعيد تحميل nginx
 mkdir -p /etc/letsencrypt/renewal-hooks/deploy
 cat > /etc/letsencrypt/renewal-hooks/deploy/sumer-nginx.sh <<EOF
 #!/bin/sh
-cd $(pwd) && $COMPOSE up -d --force-recreate nginx
+cp -L /etc/letsencrypt/live/$DOMAIN/fullchain.pem /etc/letsencrypt/live/$DOMAIN/privkey.pem /etc/sumer-certs/
+cd $(pwd) && $COMPOSE restart nginx
 EOF
 chmod +x /etc/letsencrypt/renewal-hooks/deploy/sumer-nginx.sh
 sed -i "s|^authenticator.*|authenticator = webroot\nwebroot_path = /var/www/certbot,|" "/etc/letsencrypt/renewal/$DOMAIN.conf"
