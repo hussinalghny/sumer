@@ -1,0 +1,4 @@
+# اختياري: خدمات الذكاء المحلية. النماذج تُنزَّل مرة واحدة إلى SUMER_MODELS_DIR (انظر docs/INSTALL.md)
+faster-whisper
+ctranslate2
+sentencepiece

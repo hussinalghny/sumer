@@ -1,0 +1,26 @@
+# إعدادات خاصة بخادم صغير (Hostinger KVM 1: معالج واحد، ذاكرة ~4GB).
+# تُستخدم فوق الملف الأساسي:
+#   docker compose -f docker-compose.yml -f deploy/docker-compose.kvm1.yml up -d --build
+services:
+  postgres:
+    command: ["postgres", "-c", "log_statement=none", "-c", "shared_buffers=512MB",
+              "-c", "work_mem=16MB", "-c", "maintenance_work_mem=128MB",
+              "-c", "effective_cache_size=1536MB", "-c", "max_connections=60"]
+
+  redis:
+    command: ["redis-server", "--save", "", "--appendonly", "no",
+              "--maxmemory", "192mb", "--maxmemory-policy", "allkeys-lru"]
+
+  api:
+    command: ["python", "-m", "sumer", "api", "--host", "0.0.0.0", "--port", "8000", "--workers", "2"]
+
+  worker:
+    command: ["python", "-m", "sumer", "worker", "--concurrency", "4"]
+    deploy: { replicas: 1 }
+
+  nginx:
+    volumes:
+      - ./deploy/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - /etc/letsencrypt/live/${SUMER_DOMAIN}/fullchain.pem:/etc/nginx/certs/fullchain.pem:ro
+      - /etc/letsencrypt/live/${SUMER_DOMAIN}/privkey.pem:/etc/nginx/certs/privkey.pem:ro
+      - /var/www/certbot:/var/www/certbot:ro

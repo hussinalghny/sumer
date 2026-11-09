@@ -1,0 +1,22 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root { color-scheme: light; }
+html.dark { color-scheme: dark; }
+html, body { height: 100%; }
+body { @apply bg-surface-50 text-ink antialiased dark:bg-night dark:text-surface-100; font-feature-settings: "kern"; }
+::selection { background: rgba(36, 71, 200, .18); }
+:focus-visible { outline: 3px solid rgba(36, 71, 200, .45); outline-offset: 2px; border-radius: 10px; }
+mark { @apply rounded bg-gold-400/30 px-0.5 text-inherit dark:bg-gold-400/25; }
+.glass { @apply bg-surface-50/75 backdrop-blur-xl backdrop-saturate-150 dark:bg-night-50/75; }
+.ltr-text { direction: ltr; unicode-bidi: plaintext; }
+h1, h2, h3 { text-wrap: balance; }
+.no-scrollbar { scrollbar-width: none; }
+.no-scrollbar::-webkit-scrollbar { display: none; }
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
+
+@layer components {
+  .input { @apply w-full rounded-xl border border-surface-300 bg-white px-3 py-2 text-sm outline-none transition focus:border-lapis-600/60 focus:shadow-ring dark:border-night-400 dark:bg-night-200; }
+  select.input { @apply pe-8; }
+}
