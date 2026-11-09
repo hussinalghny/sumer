@@ -1,7 +1,8 @@
 export type Seg = { t: string; h: boolean };
 export type Result = {
   url: string; title: string; host: string; lang: string | null; category: string; doc_type: string;
-  indexed_at: string; published_at: string | null; title_hl: Seg[]; snippet: Seg[]; iraqi: boolean;
+  indexed_at: string | null; published_at: string | null; title_hl: Seg[]; snippet: Seg[]; iraqi: boolean;
+  source?: "web";
   score?: number; explain?: Record<string, number>;
 };
 export type SearchResponse = {
@@ -9,12 +10,13 @@ export type SearchResponse = {
   corrected: string | null; did_you_mean: string | null; understood: { raw: string; label: string; kind: string }[];
   related: string[]; panel: null | { title: string; description: string | Seg[]; url: string; host: string; category: string; verified: boolean };
   lang: string | null;
+  local_total?: number; web_provider?: string | null;
 };
 export type PublicConfig = {
   name_ar: string; name_en: string; tagline_ar: string; tagline_en: string; logo: string | null;
   default_lang: string; default_theme: string; maintenance: boolean; announcement: { enabled: boolean; ar: string; en: string } | null;
   languages: { code: string; native_name: string; direction: string }[];
-  features: { images: boolean; voice: boolean; translation: boolean; reverse_image: boolean }; safe_default: string;
+  features: { images: boolean; voice: boolean; translation: boolean; reverse_image: boolean; web_fallback?: boolean }; safe_default: string;
 };
 
 export class ApiError extends Error {

@@ -8,6 +8,7 @@ from pydantic import BaseModel, Field
 
 from . import ai, db, images, metrics, privacy, rconn
 from . import search as S
+from . import websearch as WS
 from .config import settings
 
 router = APIRouter(prefix="/api")
@@ -79,7 +80,8 @@ def public_config():
         "maintenance": s.get("site.maintenance", False), "announcement": s.get("site.announcement"),
         "languages": [dict(l) for l in langs],
         "features": {"images": db.get_setting("search.image_enabled", True), "voice": ai_state["speech"],
-                     "translation": ai_state["translation"], "reverse_image": True},
+                     "translation": ai_state["translation"], "reverse_image": True,
+                     "web_fallback": WS.enabled()},
         "safe_default": db.get_setting("search.safe_default", "moderate"),
     }
 
@@ -110,8 +112,25 @@ async def search(body: SearchIn, request: Request):
     await privacy.count(r, "latency_ms_sum", "", ms)
     await privacy.count(r, "lang", res.get("lang") or "unknown")
     await privacy.count(r, "category", body.category or "all")
-    if not res["total"]:
+    local_total = res["total"]
+    if not local_total:
         await privacy.count(r, "zero_results")
+    # فهرس سومر قليل النتائج؟ نكمّل من الويب العام (موسومة بوضوح، بلا تخزين، وبدون IP المستخدم)
+    res["local_total"] = local_total
+    res["web_provider"] = None
+    if (WS.enabled() and local_total < WS.threshold() and not body.category and not body.since_days
+            and (res["understood"] or body.q.strip())):
+        try:
+            web, more = await WS.search(body.q, body.page, body.lang, safe)
+        except Exception:
+            web, more = [], False
+            await privacy.count(r, "errors", "web_fallback")
+        if web:
+            await privacy.count(r, "web_fallback")
+            local_urls = {x["url"] for x in res["results"]}
+            res["results"] += [x for x in web if x["url"] not in local_urls]
+            res["web_provider"] = WS.PROVIDER
+            res["total"] = local_total + (WS.MAX_PAGES * 10 if more else len(web) + (body.page - 1) * 10)
     return res
 
 

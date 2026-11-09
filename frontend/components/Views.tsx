@@ -103,7 +103,7 @@ export function WebResults({ q, config, onSearch }: { q: string; config: PublicC
 
         {first && (
           <div className="mb-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-ink-muted">
-            <span>{t.results(total, Math.max(1, Math.round(first.took_ms)))}</span>
+            <span>{first.web_provider ? t.webNote(first.local_total ?? 0, first.web_provider) : t.results(total, Math.max(1, Math.round(first.took_ms)))}</span>
             <span className="flex items-center gap-1.5 font-medium text-emerald-600 dark:text-emerald-400"><Lock className="h-3.5 w-3.5" />{t.notStored}</span>
           </div>
         )}
@@ -138,6 +138,7 @@ export function WebResults({ q, config, onSearch }: { q: string; config: PublicC
                 <div className="min-w-0 leading-tight">
                   <div className="flex items-center gap-2 text-sm font-medium">
                     <span className="ltr-text truncate">{r.host}</span>
+                    {r.source === "web" && <span className="rounded-md bg-gold-500/15 px-1.5 py-0.5 text-[11px] font-semibold text-gold-600 dark:text-gold-400">{t.fromWeb}</span>}
                     {r.category !== "web" && <span className="rounded-md bg-surface-100 px-1.5 py-0.5 text-[11px] font-semibold text-ink-muted dark:bg-night-300">{t.cat[r.category] ?? r.category}</span>}
                     {r.lang && <span className="text-[11px] text-ink-faint">{t.langs[r.lang] ?? r.lang}</span>}
                   </div>
@@ -148,7 +149,7 @@ export function WebResults({ q, config, onSearch }: { q: string; config: PublicC
                 <a href={r.url} rel="noreferrer noopener" className="text-lapis-700 hover:underline dark:text-lapis-400"><Segs segs={r.title_hl} /></a>
               </h3>
               <p className="mt-1 text-[15.5px] leading-7 text-ink-soft dark:text-surface-300"><Segs segs={r.snippet} /></p>
-              <p className="mt-1 text-xs text-ink-faint">{t.indexed} {fmtDate(r.published_at ?? r.indexed_at, lang)}</p>
+              {(r.published_at ?? r.indexed_at) && <p className="mt-1 text-xs text-ink-faint">{t.indexed} {fmtDate((r.published_at ?? r.indexed_at)!, lang)}</p>}
             </motion.li>
           ))}
         </ol>

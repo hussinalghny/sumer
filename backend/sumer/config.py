@@ -26,6 +26,9 @@ class Settings:
     cookie_secure: bool = field(default_factory=lambda: _bool("SUMER_COOKIE_SECURE", True))
     cors_origins: tuple = field(default_factory=lambda: tuple(
         o for o in os.getenv("SUMER_CORS_ORIGINS", "http://localhost:3000").split(",") if o))
+    # اختياري: نتائج احتياطية من الويب العام (Brave Search API) عندما يقل ما في الفهرس المحلي
+    brave_api_key: str = field(default_factory=lambda: os.getenv("SUMER_BRAVE_API_KEY", ""))
+    web_fallback_min: int = field(default_factory=lambda: int(os.getenv("SUMER_WEB_FALLBACK_MIN", "10")))
     version: str = "1.0.0"
 
     def validate(self):
