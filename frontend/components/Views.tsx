@@ -1,15 +1,12 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { ArrowLeftRight, BadgeCheck, ExternalLink, FileText, ImageIcon, Info, Languages, Loader2, Lock, Sparkles, Upload } from "lucide-react";
+import { ArrowLeftRight, BadgeCheck, ExternalLink, FileText, SlidersHorizontal, ImageIcon, Info, Languages, Loader2, Lock, Sparkles, Upload } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ApiError, post, upload, type PublicConfig, type Result, type SearchResponse } from "@/lib/api";
 import { usePrefs } from "@/lib/prefs";
 import { Segs } from "./Chrome";
 
-const CAT_COLORS: Record<string, string> = {
-  gov: "bg-emerald-600", academic: "bg-lapis-600", news: "bg-gold-500", tech: "bg-violet-600", document: "bg-rose-600", web: "bg-ink-soft",
-};
 
 function fmtDate(iso: string, lang: string) {
   try { return new Date(iso).toLocaleDateString(lang === "ar" ? "ar-IQ" : "en-GB", { year: "numeric", month: "short", day: "numeric" }); }
@@ -32,7 +29,8 @@ export function WebResults({ q, config, onSearch }: { q: string; config: PublicC
   const [f, setF] = useState<WebFilters>({ category: "", lang: "", since: "", sort: "relevance", safe: "" });
   const [pages, setPages] = useState<SearchResponse[]>([]);
   const [page, setPage] = useState(1);
-  const [infinite, setInfinite] = useState(false);
+  const infinite = false;
+  const [toolsOpen, setToolsOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState("");
   const sentinel = useRef<HTMLDivElement>(null);
@@ -77,10 +75,16 @@ export function WebResults({ q, config, onSearch }: { q: string; config: PublicC
   return (
     <div className="grid min-w-0 gap-10 lg:grid-cols-[minmax(0,1fr)_340px]">
       <div className="min-w-0">
-        <div className="no-scrollbar mb-3 flex items-center gap-1 overflow-x-auto">
+        <div className="mb-3 flex items-center gap-2">
+        <div className="no-scrollbar flex min-w-0 flex-1 items-center gap-1 overflow-x-auto">
           {chip("all", "")}{chip("gov", "gov")}{chip("academic", "academic")}{chip("news", "news")}{chip("docs", "docs")}{chip("tech", "tech")}
         </div>
-        <div className="mb-4 flex flex-wrap items-center gap-2">
+          <button onClick={() => setToolsOpen((o) => !o)} aria-expanded={toolsOpen}
+            aria-label={t.tools} className={`flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full px-3.5 py-1.5 text-sm transition ${toolsOpen || f.lang || f.since || f.sort !== "relevance" || f.safe ? "text-lapis-700 dark:text-lapis-400" : "text-ink-muted"} hover:bg-surface-100 dark:hover:bg-night-200`}>
+            <SlidersHorizontal className="h-4 w-4" /><span className="hidden sm:inline">{t.tools}</span>
+          </button>
+        </div>
+        {toolsOpen && <div className="mb-4 flex flex-wrap items-center gap-2">
           <select aria-label="language" className={sel} value={f.lang} onChange={(e) => setF({ ...f, lang: e.target.value })}>
             <option value="">{t.filters.any}</option>
             {config?.languages.map((l) => <option key={l.code} value={l.code}>{l.native_name}</option>)}
@@ -96,10 +100,7 @@ export function WebResults({ q, config, onSearch }: { q: string; config: PublicC
             <option value="">{t.filters.safe}</option><option value="strict">{t.filters.strict}</option>
             <option value="moderate">{t.filters.moderate}</option><option value="off">{t.filters.off}</option>
           </select>
-          <label className="ms-auto flex items-center gap-2 text-sm text-ink-muted">
-            <input type="checkbox" checked={infinite} onChange={(e) => setInfinite(e.target.checked)} className="accent-lapis-600" />{t.infinite}
-          </label>
-        </div>
+        </div>}
 
         {first && (
           <div className="mb-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-ink-muted">
@@ -132,20 +133,20 @@ export function WebResults({ q, config, onSearch }: { q: string; config: PublicC
           {results.map((r, i) => (
             <motion.li key={r.url} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: Math.min(i, 10) * .03, duration: .3 }} className="py-5">
               <div className="flex items-center gap-3">
-                <span className={`grid h-8 w-8 shrink-0 place-items-center rounded-xl text-sm font-bold text-white ${CAT_COLORS[r.category] ?? "bg-ink-soft"}`}>
-                  {r.doc_type === "pdf" ? <FileText className="h-4 w-4" /> : (r.host.replace(/^www\./, "")[0] ?? "").toUpperCase()}
+                <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full border border-surface-200 bg-white text-xs font-semibold text-ink-soft dark:border-night-300 dark:bg-night-200" aria-hidden>
+                  {r.doc_type === "pdf" ? <FileText className="h-3.5 w-3.5" /> : (r.host.replace(/^www\./, "")[0] ?? "").toUpperCase()}
                 </span>
                 <div className="min-w-0 leading-tight">
                   <div className="flex items-center gap-2 text-sm font-medium">
-                    <span className="ltr-text truncate">{r.host}</span>
+                    <span className="ltr-text truncate">{r.host.replace(/^www\./, "")}</span>
                     {r.source === "web" && <span className="rounded-md bg-gold-500/15 px-1.5 py-0.5 text-[11px] font-semibold text-gold-600 dark:text-gold-400">{t.fromWeb}</span>}
                     {r.category !== "web" && <span className="rounded-md bg-surface-100 px-1.5 py-0.5 text-[11px] font-semibold text-ink-muted dark:bg-night-300">{t.cat[r.category] ?? r.category}</span>}
                     {r.lang && <span className="text-[11px] text-ink-faint">{t.langs[r.lang] ?? r.lang}</span>}
                   </div>
-                  <div className="ltr-text truncate text-xs text-ink-faint">{r.url}</div>
+                  <div className="ltr-text truncate text-xs text-ink-faint">{r.url.replace(/^https?:\/\/(www\.)?/, "").replace(/\/$/, "").split("/").join(" › ")}</div>
                 </div>
               </div>
-              <h3 className="mt-2 text-xl font-semibold leading-snug">
+              <h3 className="mt-2 text-xl font-medium leading-snug">
                 <a href={r.url} rel="noreferrer noopener" className="text-lapis-700 hover:underline dark:text-lapis-400"><Segs segs={r.title_hl} /></a>
               </h3>
               <p className="mt-1 text-[15.5px] leading-7 text-ink-soft dark:text-surface-300"><Segs segs={r.snippet} /></p>

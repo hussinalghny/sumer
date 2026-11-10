@@ -9,11 +9,13 @@ export default {
       colors: {
         lapis: { 50: "#eef2ff", 100: "#dfe6ff", 200: "#c0ccff", 400: "#6f8dff", 500: "#3a5fe6", 600: "#2447c8", 700: "#1c379c", 800: "#18307f", 900: "#142659" },
         gold: { 400: "#e3b04b", 500: "#c99a2e", 600: "#a87d1e" },
-        ink: { DEFAULT: "#1d1d1f", soft: "#424245", muted: "#6e6e73", faint: "#86868b" },
+        // muted 6.1:1 و faint 5.1:1 على الخلفية الفاتحة (فوق حد 4.5:1 للنص الصغير)
+        ink: { DEFAULT: "#1d1d1f", soft: "#3a3a3d", muted: "#5f5f64", faint: "#6e6e73" },
         surface: { DEFAULT: "#ffffff", 50: "#fbfbfd", 100: "#f5f5f7", 200: "#e8e8ed", 300: "#d2d2d7" },
         night: { DEFAULT: "#000000", 50: "#0b0b0d", 100: "#161618", 200: "#1c1c1e", 300: "#2c2c2e", 400: "#3a3a3c" },
       },
       fontFamily: {
+        display: ["Reem Kufi", "-apple-system", "SF Arabic", "sans-serif"],
         sans: ["-apple-system", "BlinkMacSystemFont", "SF Arabic", "SF Pro Text", "Segoe UI", "Noto Sans Arabic", "Tahoma", "sans-serif"],
       },
       boxShadow: {

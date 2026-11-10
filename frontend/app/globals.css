@@ -8,7 +8,14 @@ html, body { height: 100%; }
 body { @apply bg-surface-50 text-ink antialiased dark:bg-night dark:text-surface-100; font-feature-settings: "kern"; }
 ::selection { background: rgba(36, 71, 200, .18); }
 :focus-visible { outline: 3px solid rgba(36, 71, 200, .45); outline-offset: 2px; border-radius: 10px; }
-mark { @apply rounded bg-gold-400/30 px-0.5 text-inherit dark:bg-gold-400/25; }
+/* التمييز بالوزن لا بالخلفية: أهدأ وأسهل قراءة */
+mark { @apply bg-transparent font-semibold text-ink dark:text-white; }
+a mark { color: inherit !important; }
+/* الوضع الداكن: نصوص ثانوية أفتح حتى تبقى فوق 4.5:1 على الأسطح الداكنة */
+html.dark .text-ink-muted { color: #a1a1a6; }
+html.dark .text-ink-faint { color: #8e8e93; }
+html.dark .text-ink-soft { color: #c7c7cc; }
+@font-face { font-family: "Reem Kufi"; src: url(/fonts/reem-kufi-arabic-700-normal.woff2) format("woff2"); font-weight: 700; font-display: swap; unicode-range: U+0600-06FF, U+0750-077F, U+FB50-FDFF, U+FE70-FEFF; }
 .glass { @apply bg-surface-50/75 backdrop-blur-xl backdrop-saturate-150 dark:bg-night-50/75; }
 .ltr-text { direction: ltr; unicode-bidi: plaintext; }
 h1, h2, h3 { text-wrap: balance; }

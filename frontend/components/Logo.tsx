@@ -11,3 +11,16 @@ export function Mark({ className = "h-8 w-8" }: { className?: string }) {
     </svg>
   );
 }
+
+// العلامة النصية: «سومر» بخط كوفي (يستحضر النقوش الأولى) مع إسفين ذهبي — إشارة للخط المسماري، أول كتابة في التاريخ
+export function Wordmark({ name = "سومر", className = "" }: { name?: string; className?: string }) {
+  return (
+    <div className={`relative inline-flex flex-col items-center ${className}`}>
+      <span className="font-display text-7xl font-bold leading-none tracking-tight text-ink dark:text-white sm:text-8xl">{name}</span>
+      <svg viewBox="0 0 64 14" className="mt-4 h-3.5 w-16" aria-hidden="true">
+        <defs><linearGradient id="wm-g" x1="0" x2="1"><stop offset="0" stopColor="#f6d27a" /><stop offset="1" stopColor="#c58f22" /></linearGradient></defs>
+        <path d="M0 7 L64 0 L64 14 Z" fill="url(#wm-g)" />
+      </svg>
+    </div>
+  );
+}

@@ -22,17 +22,18 @@ export function Controls() {
   );
 }
 
-export function Footer() {
+export function Footer({ privacy = true, onInspect }: { privacy?: boolean; onInspect?: () => void }) {
   const { t } = usePrefs();
   return (
     <footer className="border-t border-surface-200 px-6 py-5 text-sm text-ink-muted dark:border-night-300">
       <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-4">
-        <span className="flex items-center gap-2"><ShieldCheck className="h-4 w-4 text-emerald-600" />{t.privacyLine}</span>
-        <nav className="flex gap-5">
+        {privacy ? <span className="flex items-center gap-2"><ShieldCheck className="h-4 w-4 text-emerald-600" />{t.privacyLine}</span> : <span />}
+        <nav className="flex flex-wrap gap-x-5 gap-y-2 whitespace-nowrap">
           <Link href="/about" className="hover:text-ink dark:hover:text-surface-100">{t.about}</Link>
           <Link href="/privacy" className="hover:text-ink dark:hover:text-surface-100">{t.privacy}</Link>
           <Link href="/contact" className="hover:text-ink dark:hover:text-surface-100">{t.contact}</Link>
           <Link href="/status" className="hover:text-ink dark:hover:text-surface-100">{t.status}</Link>
+          {onInspect && <button onClick={onInspect} className="hover:text-ink dark:hover:text-surface-100">{t.inspectTool}</button>}
         </nav>
       </div>
     </footer>

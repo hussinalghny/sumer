@@ -136,13 +136,19 @@ export function Stat({ label, value, hint, tone }: { label: string; value: React
   return (
     <div className="rounded-2xl border border-surface-200 bg-white p-4 dark:border-night-300 dark:bg-night-100">
       <div className="text-xs text-ink-muted">{label}</div>
-      <div className={`mt-1 text-2xl font-semibold tabular-nums ${c}`}>{value ?? "—"}</div>
+      <div className={`mt-1 text-2xl font-semibold tabular-nums ${c}`}><bdi dir="ltr">{value ?? "—"}</bdi></div>
       {hint && <div className="mt-0.5 text-xs text-ink-faint">{hint}</div>}
     </div>
   );
 }
 
+const STATUS_AR: Record<string, string> = { ok: "سليم", true: "نعم", false: "لا", active: "فعّال", done: "منجز", running: "يعمل", ready: "جاهز", live: "مباشر",
+  pending: "معلّق", paused: "متوقف مؤقتاً", idle: "خامل", missing_model: "النموذج غير منصّب", missing_package: "الحزمة غير منصّبة", failed: "فشل", error: "خطأ",
+  blocked: "محظور", suspended: "معلّق الحساب", stopped: "متوقف", critical: "حرج", high: "عالٍ", medium: "متوسط", low: "منخفض", cancelled: "ملغى", building: "قيد البناء",
+  robots_blocked: "ممنوع بـ robots", noindex: "غير قابل للفهرسة", duplicate: "مكرر", redirect: "تحويل", excluded: "مستبعد", retired: "متقاعد", broken: "معطّل", not_modified: "بلا تغيير" };
+
 export function Badge({ value, map }: { value: string | boolean | null | undefined; map?: Record<string, "good" | "warn" | "bad" | "info"> }) {
+  const { lang } = usePrefs();
   const v = String(value);
   const auto: Record<string, "good" | "warn" | "bad" | "info"> = { ok: "good", true: "good", active: "good", done: "good", running: "good", ready: "good", live: "good",
     pending: "info", paused: "warn", idle: "warn", missing_model: "warn", missing_package: "warn", not_modified: "info", redirect: "info", duplicate: "warn",
@@ -152,7 +158,7 @@ export function Badge({ value, map }: { value: string | boolean | null | undefin
   const cls = { good: "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300", warn: "bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300",
     bad: "bg-red-50 text-red-700 dark:bg-red-950/40 dark:text-red-300", info: "bg-surface-100 text-ink-muted dark:bg-night-300" }[tone];
   return <span className={`inline-flex items-center gap-1 whitespace-nowrap rounded-md px-2 py-0.5 text-xs font-medium ${cls}`}>
-    <span className={`h-1.5 w-1.5 rounded-full ${{ good: "bg-emerald-500", warn: "bg-amber-500", bad: "bg-red-500", info: "bg-ink-faint" }[tone]}`} />{v}</span>;
+    <span className={`h-1.5 w-1.5 rounded-full ${{ good: "bg-emerald-500", warn: "bg-amber-500", bad: "bg-red-500", info: "bg-ink-faint" }[tone]}`} />{lang === "ar" ? STATUS_AR[v] ?? v : v}</span>;
 }
 
 export type Col<T> = { key: string; label: string; render?: (row: T) => React.ReactNode; className?: string };
@@ -276,7 +282,7 @@ export function Gauge({ label, value, detail }: { label: string; value: number; 
   const tone = value > 90 ? "bg-red-500" : value > 75 ? "bg-amber-500" : "bg-lapis-600";
   return (
     <div>
-      <div className="mb-1 flex justify-between text-xs"><span className="text-ink-muted">{label}</span><span className="tabular-nums">{value.toFixed(0)}%{detail ? ` · ${detail}` : ""}</span></div>
+      <div className="mb-1 flex justify-between text-xs"><span className="text-ink-muted">{label}</span><span dir="ltr" className="tabular-nums">{value.toFixed(0)}%{detail ? ` · ${detail}` : ""}</span></div>
       <div className="h-2 overflow-hidden rounded-full bg-surface-100 dark:bg-night-300"><div className={`h-full rounded-full ${tone} transition-all`} style={{ width: `${Math.min(100, value)}%` }} /></div>
     </div>
   );

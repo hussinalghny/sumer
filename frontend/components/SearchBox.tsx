@@ -1,7 +1,7 @@
 "use client";
 
 import { AnimatePresence, motion } from "framer-motion";
-import { Camera, Clock, Loader2, Mic, MicOff, Search, Square, X } from "lucide-react";
+import { Camera, Clock, Loader2, Mic, Search, Square, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { post, upload, type PublicConfig } from "@/lib/api";
 import { usePrefs } from "@/lib/prefs";
@@ -93,12 +93,12 @@ export function SearchBox({ value, onChange, onSubmit, onImage, config, size = "
           <button type="button" onClick={() => onChange("")} aria-label={t.clear}
             className="rounded-full p-2 text-ink-faint hover:bg-surface-100 dark:hover:bg-night-300"><X className="h-4 w-4" /></button>
         )}
-        <span className="mx-1 hidden h-6 w-px bg-surface-200 dark:bg-night-300 sm:block" aria-hidden />
-        <button type="button" onClick={toggleVoice} disabled={!voiceOk || voiceBusy}
+        {(voiceOk || onImage) && <span className="mx-1 hidden h-6 w-px bg-surface-200 dark:bg-night-300 sm:block" aria-hidden />}
+        {voiceOk && <button type="button" onClick={toggleVoice} disabled={voiceBusy}
           title={voiceOk ? (rec ? t.voiceListening : t.voice) : t.voiceUnavailable} aria-label={t.voice}
           className={`rounded-full p-2 transition ${rec ? "animate-pulse bg-red-500 text-white" : "text-lapis-600 hover:bg-lapis-50 dark:text-lapis-400 dark:hover:bg-night-300"} disabled:cursor-not-allowed disabled:text-ink-faint/60 disabled:hover:bg-transparent`}>
-          {voiceBusy ? <Loader2 className="h-5 w-5 animate-spin" /> : rec ? <Square className="h-5 w-5" /> : voiceOk ? <Mic className="h-5 w-5" /> : <MicOff className="h-5 w-5" />}
-        </button>
+          {voiceBusy ? <Loader2 className="h-5 w-5 animate-spin" /> : rec ? <Square className="h-5 w-5" /> : <Mic className="h-5 w-5" />}
+        </button>}
         {onImage && (
           <>
             <button type="button" onClick={() => fileRef.current?.click()} title={t.imageSearch} aria-label={t.imageSearch}
