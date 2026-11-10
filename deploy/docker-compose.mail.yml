@@ -1,0 +1,27 @@
+# سومر بريد: يُضاف فوق ملفات سومر.
+#   docker compose -f docker-compose.yml -f deploy/docker-compose.kvm1.yml -f deploy/docker-compose.mail.yml up -d --build
+services:
+  mail-api:
+    build: ./mail/backend
+    restart: unless-stopped
+    environment:
+      SUMERMAIL_REDIS_URL: redis://redis:6379/2
+      SUMERMAIL_SECRET: ${SUMERMAIL_SECRET:?ضع SUMERMAIL_SECRET في .env}
+      SUMERMAIL_ENV: production
+      SUMERMAIL_TRUSTED_PROXY: "1"
+    depends_on: [redis]
+
+  mail-web:
+    build: ./mail/web
+    restart: unless-stopped
+    environment: { SUMER_MAIL_API_INTERNAL: "http://mail-api:8100" }
+    depends_on: [mail-api]
+
+  nginx:
+    volumes:
+      - ./deploy/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - /etc/sumer-certs:/etc/nginx/certs:ro
+      - /var/www/certbot:/var/www/certbot:ro
+      - /etc/sumer-certs-mail:/etc/nginx/certs-mail:ro
+      - ./deploy/nginx-mail.conf:/etc/nginx/conf.d/mail.conf:ro
+    depends_on: [web, api, mail-web]

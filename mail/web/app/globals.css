@@ -1,0 +1,19 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@font-face { font-family: "Reem Kufi"; src: url(/fonts/reem-kufi-arabic-700-normal.woff2) format("woff2"); font-weight: 700; font-display: swap; }
+html, body { height: 100%; }
+body { @apply bg-surface-100 text-ink antialiased dark:bg-night dark:text-surface-100; }
+:focus-visible { outline: 3px solid rgba(36, 71, 200, .45); outline-offset: 2px; border-radius: 10px; }
+html.dark .text-ink-muted, .dark .text-ink-muted { color: #a1a1a6; }
+@media (prefers-color-scheme: dark) { .text-ink-muted { color: #a1a1a6; } .text-ink-faint { color: #8e8e93; } }
+.no-scrollbar { scrollbar-width: none; } .no-scrollbar::-webkit-scrollbar { display: none; }
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
+@layer components {
+  .field { @apply w-full rounded-xl border border-surface-300 bg-white px-3.5 py-3 text-base outline-none transition focus:border-lapis-600 dark:border-night-400 dark:bg-night-200; }
+  .btn { @apply inline-flex min-h-[44px] items-center justify-center gap-2 rounded-xl px-4 font-semibold transition disabled:opacity-50; }
+  .btn-primary { @apply btn bg-lapis-600 text-white hover:bg-lapis-700; }
+  .btn-ghost { @apply btn text-ink hover:bg-surface-200 dark:text-surface-100 dark:hover:bg-night-300; }
+  .card { @apply rounded-2xl bg-white dark:bg-night-200; }
+}
