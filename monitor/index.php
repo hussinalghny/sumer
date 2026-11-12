@@ -82,6 +82,26 @@ switch ($act) {
              empty($_POST['deface']) ? 0 : 1, $agent, bin2hex(random_bytes(24)), (int)!empty($_POST['laravel']), (int)!empty($_POST['cf']),
              $sh ?: null, max(1, (int)($_POST['ssh_port'] ?? 22)), $sh ? $su : null, $sh ? rtrim($sp, '/') : null, now()]);
         back($sh ? 'تمت الإضافة — اضغط «اختبار SSH» للتأكد من الاتصال' : ($agent ? 'تمت الإضافة — نزّل ملف الوكيل وارفعه' : 'تمت الإضافة'), '?site=' . db()->lastInsertId());
+    case 'import':
+        // استيراد جماعي من JSON (مثلاً من مخرجات مساعد هوستنجر). لا يُستورد أي سر: الأسرار تُولَّد هنا.
+        $raw = (string)($_POST['json'] ?? ''); $a = strpos($raw, '['); $b = strrpos($raw, ']');
+        $rows = ($a !== false && $b > $a) ? json_decode(substr($raw, $a, $b - $a + 1), true) : null;
+        if (!is_array($rows)) back('النص ليس JSON صالحاً. الصق المصفوفة كما هي من [ إلى ].');
+        $have = array_map('host_of', q('SELECT url FROM gm_sites')->fetchAll(PDO::FETCH_COLUMN)); $add = 0; $dup = 0; $bad = 0;
+        foreach (array_slice($rows, 0, 300) as $r) {
+            $url = trim((string)($r['url'] ?? ''));
+            if ($url !== '' && !preg_match('~^https?://~i', $url)) $url = 'https://' . $url;
+            if (!is_array($r) || !filter_var($url, FILTER_VALIDATE_URL)) { $bad++; continue; }
+            if (in_array(host_of($url), $have, true)) { $dup++; continue; }
+            $sh = trim((string)($r['ssh_host'] ?? '')); $su = trim((string)($r['ssh_user'] ?? '')); $sp = rtrim(trim((string)($r['path'] ?? '')), '/');
+            if ($sh !== '' && (!preg_match('~^[a-z0-9][a-z0-9._-]*$~i', $sh) || !preg_match('~^[a-z_][a-z0-9._-]*$~i', $su) || $sp === '' || $sp[0] !== '/')) $sh = '';
+            q('INSERT INTO gm_sites (name,url,keyword,deface_check,agent_url,secret,root_up,cf,ssh_host,ssh_port,ssh_user,ssh_path,created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)',
+                [mb_substr(trim((string)($r['name'] ?? '')) ?: host_of($url), 0, 120), $url, '', 1, rtrim(preg_replace('~[?#].*$~', '', $url), '/') . '/gm-agent.php', bin2hex(random_bytes(24)),
+                 (int)!empty($r['laravel']), (int)!empty($r['cloudflare']), $sh ?: null, max(1, (int)($r['ssh_port'] ?? 22)), $sh ? $su : null, $sh ? $sp : null, now()]);
+            $have[] = host_of($url); $add++;
+        }
+        act_log(0, 'admin', 'import', "استيراد جماعي: $add أصل جديد، $dup مكرر، $bad غير صالح");
+        back("أُضيف {$add} أصل. مكرر: {$dup}، غير صالح: {$bad}", '?v=assets');
     case 'sshtest':
         if ($S && $S['ssh_host']) { $j = ssh_call($S, 'sum'); back($j ? '✅ الاتصال ناجح — ' . (int)$j['count'] . ' ملف كود' : '❌ فشل: ' . $GLOBALS['gm_ssh_err']); }
         back();

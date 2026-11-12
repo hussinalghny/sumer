@@ -295,7 +295,11 @@ function view_assets(): void {
 <label>اسم المستخدم</label><input type="text" name="ssh_user" dir="ltr" placeholder="u123456789">
 <label>المسار الكامل للمجلد العام</label><input type="text" name="ssh_path" dir="ltr" placeholder="/home/u123456789/domains/example.com/public_html">
 <p class="mut">أضف المفتاح العام للمراقب (من الإعدادات) إلى SSH Keys في لوحة الاستضافة أولاً.</p></details>
-<p><button class="btn pri">إضافة الأصل</button></p></form></div></section><?php
+<p><button class="btn pri">إضافة الأصل</button></p></form></div></section>
+<section class="pn"><h2>استيراد جماعي <small>الصق قائمة JSON بكل مواقعك، مثلاً من مساعد هوستنجر</small></h2><div class="pb"><form method="post"><?= csrf_in() ?><input type="hidden" name="act" value="import">
+<textarea name="json" rows="7" dir="ltr" required placeholder='[{"name":"My site","url":"https://example.com","ssh_host":"1.2.3.4","ssh_port":65002,"ssh_user":"u123456789","path":"/home/u123456789/domains/example.com/public_html","laravel":false,"cloudflare":false}]'></textarea>
+<p class="mut">المواقع الموجودة مسبقاً تُتخطّى. حقول SSH اختيارية. لا تلصق كلمات سر: النظام لا يحتاجها.</p>
+<p><button class="btn pri">استيراد</button></p></form></div></section><?php
 }
 function view_attackers(): void {
     $days = (int)($_GET['d'] ?? 1) === 7 ? 7 : 1;
