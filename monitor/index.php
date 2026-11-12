@@ -30,11 +30,11 @@ if (!setting('admin_hash')) {
         $err = 'المفتاح خاطئ (أو لم تغيّر CRON_KEY في config.php) أو كلمة المرور أقل من 10 أحرف';
     }
     page_top('إعداد المراقب', false); ?>
-    <div class="card" style="max-width:420px;margin:50px auto"><h1>🛡️ GHANI Monitor — الإعداد الأول</h1><?= $err ? "<p class='iss'>$err</p>" : '' ?>
+    <section class="pn"><h2>GHANI SOC: الإعداد الأول</h2><div class="pb"><?= $err ? "<div class='note'>$err</div>" : '' ?>
     <form method="post"><?= csrf_in() ?><input type="hidden" name="act" value="setup">
     <label>مفتاح CRON_KEY (من config.php)</label><input type="password" name="key" required>
     <label>كلمة مرور اللوحة (10 أحرف فأكثر)</label><input type="password" name="pass" minlength="10" required>
-    <p><button>إنشاء</button></p></form></div><?php page_end(); exit;
+    <p><button class="btn pri">إنشاء الحساب</button></p></form></div></section><?php page_end(); exit;
 }
 if (empty($_SESSION['in'])) {
     $err = '';
@@ -51,9 +51,9 @@ if (empty($_SESSION['in'])) {
         }
     }
     page_top('دخول', false); ?>
-    <div class="card" style="max-width:380px;margin:60px auto"><h1>🛡️ GHANI Monitor</h1><?= $err ? "<p class='iss'>$err</p>" : '' ?>
+    <section class="pn"><h2>GHANI SOC: تسجيل الدخول</h2><div class="pb"><?= $err ? "<div class='note'>$err</div>" : '' ?>
     <form method="post"><?= csrf_in() ?><input type="hidden" name="act" value="login">
-    <label>كلمة المرور</label><input type="password" name="pass" autofocus required><p><button>دخول</button></p></form></div><?php page_end(); exit;
+    <label>كلمة المرور</label><input type="password" name="pass" autofocus required><p><button class="btn pri">دخول</button></p></form></div></section><?php page_end(); exit;
 }
 
 /* ---------- تنزيل الوكيل ---------- */
@@ -89,7 +89,7 @@ switch ($act) {
     case 'del':
         if ($S) foreach (['gm_issues', 'gm_traffic', 'gm_filelog', 'gm_requests', 'gm_blocks', 'gm_quarantine', 'gm_actions'] as $t) q("DELETE FROM $t WHERE site_id=?", [$sid]);
         if ($S) q('DELETE FROM gm_sites WHERE id=?', [$sid]);
-        back('تم الحذف', '');
+        back('تم الحذف', '?v=assets');
     case 'ok_files':
         if ($S && ($full = agent_call($S, 'full'))) {
             upd($sid, ['manifest' => pack_manifest($full['files']), 'files_sum_base' => $full['sum'], 'files_sum_last' => $full['sum'], 'files_diff' => null]);
@@ -120,7 +120,7 @@ switch ($act) {
         back();
     case 'quarantine':
         $paths = array_filter(array_map('strval', (array)($_POST['paths'] ?? [])));
-        if ($S && $paths) { $d = quarantine_files($S, $paths, 'admin', trim((string)($_POST['reason'] ?? '')) ?: 'عزل يدوي'); back('تم عزل ' . count($d) . ' من ' . count($paths) . ' ملف', '?site=' . $sid); }
+        if ($S && $paths) { $d = quarantine_files($S, $paths, 'admin', trim((string)($_POST['reason'] ?? '')) ?: 'عزل يدوي'); back('تم عزل ' . count($d) . ' من ' . count($paths) . ' ملف', '?site=' . $sid . '&tab=files'); }
         back('لم تحدد ملفات');
     case 'restore': case 'qdel':
         $Q = q('SELECT * FROM gm_quarantine WHERE id=? AND state=?', [(int)($_POST['qid'] ?? 0), 'held'])->fetch();
@@ -165,13 +165,15 @@ switch ($act) {
 
 /* ---------- التوجيه ---------- */
 if (isset($_GET['report']) && ($s = site((int)$_GET['report']))) { view_report($s); exit; }
-if (isset($_GET['ip']) && filter_var($_GET['ip'], FILTER_VALIDATE_IP)) { page_top('تحقيق IP'); view_ip($_GET['ip']); page_end(); exit; }
+if (isset($_GET['ip']) && filter_var($_GET['ip'], FILTER_VALIDATE_IP)) { page_top('تحقيق في عنوان IP', true, 'attackers'); view_ip($_GET['ip']); page_end(); exit; }
 if (isset($_GET['site']) && ($s = site((int)$_GET['site']))) {
-    page_top($s['name']);
+    page_top('الأصل: ' . $s['name'], true, 'assets');
     if (isset($_GET['file']) || isset($_GET['q'])) view_file($s, (string)($_GET['file'] ?? ''), (string)($_GET['q'] ?? ''));
     else view_site($s);
     page_end(); exit;
 }
-if (($_GET['v'] ?? '') === 'settings') { page_top('الإعدادات'); view_settings(); page_end(); exit; }
-if (($_GET['v'] ?? '') === 'log') { page_top('سجل الإجراءات'); view_log(); page_end(); exit; }
-page_top('GHANI Monitor'); view_overview(); page_end();
+$pages = ['alerts' => ['التنبيهات', 'view_alerts'], 'assets' => ['الأصول', 'view_assets'], 'attackers' => ['المهاجمون', 'view_attackers'],
+          'quarantine' => ['الحجر', 'view_quarantine'], 'log' => ['سجل الإجراءات', 'view_log'], 'settings' => ['الإعدادات', 'view_settings']];
+$v = (string)($_GET['v'] ?? '');
+if (isset($pages[$v])) { page_top($pages[$v][0], true, $v); $pages[$v][1](); page_end(); exit; }
+page_top('نظرة عامة', true, '', 120); view_overview(); page_end();
