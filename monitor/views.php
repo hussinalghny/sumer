@@ -29,6 +29,8 @@ function site_level(array $s, array $open): string {
 const LV_NAME = ['ok' => 'سليم', 'warn' => 'تحذير', 'danger' => 'خطر', 'down' => 'متوقف', 'wait' => 'بانتظار الفحص', 'lock' => '🔒 مغلق'];
 
 function page_top(string $title, bool $nav = true): void {
+    // التواريخ والأوقات تُعرض من اليسار لليمين حتى لا تنقلب داخل النص العربي
+    ob_start(fn($o) => preg_replace('~(?<![\w"=/-])(\d{4}-\d\d-\d\d(?: \d\d:\d\d(?::\d\d)?)?)(?![\w"-])~', '<bdi dir="ltr">$1</bdi>', $o));
     $flash = $_SESSION['flash'] ?? ''; unset($_SESSION['flash']); ?>
 <!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="robots" content="noindex"><meta name="referrer" content="no-referrer"><title><?= h($title) ?></title><style>
@@ -64,7 +66,7 @@ pre.src span{display:block;white-space:pre}pre.src span.hot{background:#4a1f21}p
 <?= f('run', 'افحص الآن', [], '') ?><?= f('logout', 'خروج') ?></nav></header><?php endif ?>
 <?php if ($flash): ?><div class="flash"><?= h($flash) ?></div><?php endif;
 }
-function page_end(): void { echo '</div></body></html>'; }
+function page_end(): void { echo '</div></body></html>'; ob_end_flush(); }
 
 /* ================= الرئيسية ================= */
 function view_overview(): void {
