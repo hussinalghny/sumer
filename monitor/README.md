@@ -5,7 +5,17 @@
 - `lib.php`: محرك الفحوص والاستجابة. `cron.php`: التشغيل الدوري.
 - `agent.tpl.php`: قالب الوكيل. اللوحة تولّد منه `gm-agent.php` خاص بكل موقع (بسر مختلف).
 
-## التنصيب على VPS
+## التنصيب على خادم سومر (Docker) — ghani.sumeriq.tech
+1. في لوحة الدومين: سجل **A** باسم `ghani` يأشر على IP الخادم.
+2. على الخادم، من مجلد المشروع وكـ root:
+   `git pull && bash deploy/setup-monitor.sh ghani.sumeriq.tech you@email.com`
+3. السكربت يطلّع شهادة SSL، يولّد الأسرار في `.env`، ويشغّل ثلاث خدمات: `monitor` (اللوحة)، `monitor-cron` (الفحص كل 5 دقائق)، `monitor-db` (MariaDB).
+4. افتح `https://ghani.sumeriq.tech`، أدخل مفتاح الإعداد الذي يطبعه السكربت، واختر كلمة مرور.
+5. احصر اللوحة بـ IP مالتك: أزل علامة `#` عن سطري `allow`/`deny` في `deploy/nginx-monitor.conf` ثم أعد تشغيل nginx.
+
+مفتاح SSH للمراقب يُحفظ على volume خاص (`monitorkeys`) خارج مجلد الويب.
+
+## التنصيب اليدوي على VPS (بدون Docker)
 المتطلبات: PHP 8.1+ مع `php-curl` و `php-mysql` و `php-mbstring`، و MySQL/MariaDB، و Nginx أو Apache.
 
 1. أنشئ قاعدة بيانات ومستخدم لها.

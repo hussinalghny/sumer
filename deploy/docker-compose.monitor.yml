@@ -1,0 +1,43 @@
+# GHANI Monitor: يُضاف فوق ملفات سومر، ويعمل على نطاق فرعي (مثلاً ghani.sumeriq.tech).
+#   bash deploy/setup-monitor.sh ghani.sumeriq.tech you@email.com
+services:
+  monitor-db:
+    image: mariadb:11
+    restart: unless-stopped
+    environment:
+      MARIADB_DATABASE: monitor
+      MARIADB_USER: monitor
+      MARIADB_PASSWORD: ${MONITOR_DB_PASSWORD:?ضع MONITOR_DB_PASSWORD في .env}
+      MARIADB_RANDOM_ROOT_PASSWORD: "1"
+    # خادم صغير: ذاكرة قليلة تكفي
+    command: ["--innodb-buffer-pool-size=64M", "--performance-schema=OFF", "--character-set-server=utf8mb4", "--collation-server=utf8mb4_unicode_ci"]
+    volumes: [monitordb:/var/lib/mysql]
+    healthcheck: { test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"], interval: 10s, retries: 12 }
+
+  monitor:
+    build: ./monitor
+    restart: unless-stopped
+    environment: &monitor_env
+      GM_DB_HOST: monitor-db
+      GM_DB_PASS: ${MONITOR_DB_PASSWORD}
+      GM_CRON_KEY: ${MONITOR_CRON_KEY:?ضع MONITOR_CRON_KEY في .env}
+    volumes: [monitorkeys:/var/lib/ghani-monitor]
+    depends_on: { monitor-db: { condition: service_healthy } }
+
+  # الفحص الدوري كل 5 دقائق، بنفس مستخدم الويب حتى يقرأ نفس مفتاح SSH
+  monitor-cron:
+    build: ./monitor
+    restart: unless-stopped
+    user: www-data
+    environment: *monitor_env
+    volumes: [monitorkeys:/var/lib/ghani-monitor]
+    command: ["sh", "-c", "sleep 30; while true; do php /var/www/html/cron.php; sleep 300; done"]
+    depends_on: { monitor-db: { condition: service_healthy } }
+
+  nginx:
+    volumes:
+      - /etc/sumer-certs-monitor:/etc/nginx/certs-monitor:ro
+      - ./deploy/nginx-monitor.conf:/etc/nginx/conf.d/monitor.conf:ro
+    depends_on: [monitor]
+
+volumes: { monitordb: {}, monitorkeys: {} }
