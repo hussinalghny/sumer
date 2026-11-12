@@ -36,7 +36,7 @@ function h($s): string { return htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8'
 
 function migrate(): void {
     db()->exec("CREATE TABLE IF NOT EXISTS gm_settings (k VARCHAR(50) PRIMARY KEY, v TEXT) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
-    if ((int)setting('schema', 0) >= 4) return;
+    if ((int)setting('schema', 0) >= 5) return;
     $try = function (string $sql) { try { db()->exec($sql); } catch (Throwable $e) {} };
     db()->exec("CREATE TABLE IF NOT EXISTS gm_sites (
         id INT AUTO_INCREMENT PRIMARY KEY, name VARCHAR(120) NOT NULL, url VARCHAR(255) NOT NULL,
@@ -54,7 +54,7 @@ function migrate(): void {
     foreach (['traffic_at DATETIME NULL', 'traffic_last TEXT NULL', 'cf TINYINT NOT NULL DEFAULT 0', 'lockdown TINYINT NOT NULL DEFAULT 0',
               'state_hash CHAR(32) NULL', 'score INT NULL', 'audit MEDIUMTEXT NULL', 'audit_at DATETIME NULL', 'scan MEDIUMTEXT NULL',
               'scan_at DATETIME NULL', 'scan_ignore TEXT NULL', 'dns_base TEXT NULL', 'ssh_host VARCHAR(190) NULL',
-              'ssh_port INT NOT NULL DEFAULT 22', 'ssh_user VARCHAR(64) NULL', 'ssh_path VARCHAR(500) NULL'] as $c) $try("ALTER TABLE gm_sites ADD $c");
+              'ssh_port INT NOT NULL DEFAULT 22', 'ssh_user VARCHAR(64) NULL', 'ssh_path VARCHAR(500) NULL', 'files_at DATETIME NULL'] as $c) $try("ALTER TABLE gm_sites ADD $c");
     db()->exec("CREATE TABLE IF NOT EXISTS gm_filelog (id INT AUTO_INCREMENT PRIMARY KEY, site_id INT NOT NULL, at DATETIME NOT NULL,
         path VARCHAR(500) NOT NULL, chg VARCHAR(10) NOT NULL, sus TEXT NULL) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
     db()->exec("CREATE TABLE IF NOT EXISTS gm_requests (id INT AUTO_INCREMENT PRIMARY KEY, site_id INT NOT NULL, at DATETIME NOT NULL,
@@ -68,7 +68,7 @@ function migrate(): void {
         actor VARCHAR(10) NOT NULL, action VARCHAR(30) NOT NULL, detail TEXT NOT NULL) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
     foreach (['gm_i1 ON gm_issues (site_id, closed_at)', 'gm_t1 ON gm_traffic (site_id, at)', 'gm_f1 ON gm_filelog (site_id, at)',
               'gm_r1 ON gm_requests (ip)', 'gm_r2 ON gm_requests (site_id, at)', 'gm_r3 ON gm_requests (at)'] as $i) $try("CREATE INDEX $i");
-    set_setting('schema', '4');
+    set_setting('schema', '5');
 }
 function setting(string $k, $def = null) {
     $v = q('SELECT v FROM gm_settings WHERE k=?', [$k])->fetchColumn();
@@ -114,10 +114,24 @@ function http_multi(array $reqs, int $timeout = 20): array {
     curl_multi_close($mh);
     return $out;
 }
+/* مفتاح التوقيع: الخاص يبقى هنا، والعام يُزرع داخل ملف الوكيل. اختراق أي موقع لا يكشف شيئاً عن بقية المواقع. */
+function gm_keys(): array {
+    static $k;
+    if ($k) return $k;
+    $priv = setting('agent_priv'); $pub = setting('agent_pub');
+    if (!$priv || !$pub) {
+        $res = openssl_pkey_new(['private_key_bits' => 2048, 'private_key_type' => OPENSSL_KEYTYPE_RSA]);
+        if (!$res) throw new RuntimeException('تعذر توليد مفتاح التوقيع (OpenSSL)');
+        openssl_pkey_export($res, $priv); $pub = openssl_pkey_get_details($res)['key'];
+        set_setting('agent_priv', $priv); set_setting('agent_pub', $pub);
+    }
+    return $k = [$priv, $pub];
+}
+function agent_code(): string { return strtr((string)file_get_contents(__DIR__ . '/agent.tpl.php'), ['__GM_PUBKEY__' => trim(gm_keys()[1])]); }
 function agent_req(array $s, string $mode, string $body = ''): array {
-    $ts = (string)time();
-    $sig = hash_hmac('sha256', $ts . '|' . $mode . '|' . sha1($body), $s['secret']);
-    $r = ['url' => $s['agent_url'] . '?m=' . $mode, 'headers' => ["X-GM-TS: $ts", "X-GM-SIG: $sig"], 'timeout' => 90];
+    $ts = (string)time(); $opt = 'up=' . (int)$s['root_up'] . ';cf=' . (int)$s['cf'];
+    openssl_sign($ts . '|' . $mode . '|' . sha1($body) . '|' . $opt . '|' . host_of($s['agent_url']), $sig, gm_keys()[0], OPENSSL_ALGO_SHA256);
+    $r = ['url' => $s['agent_url'] . '?m=' . $mode, 'headers' => ["X-GM-TS: $ts", "X-GM-OPT: $opt", 'X-GM-SIG: ' . base64_encode($sig)], 'timeout' => 90];
     if ($body !== '') $r['post'] = $body;
     return $r;
 }
@@ -150,7 +164,7 @@ function ssh_script(array $s, string $mode, string $body): string {
         $core = substr($tpl, strpos($tpl, '/*GM_CORE*/'));
         preg_match('~^const GM_WANT = .*;$~m', $tpl, $m); $want = $m[0];
     }
-    return "<?php\nerror_reporting(0); @set_time_limit(120); @ini_set('memory_limit', '256M');\n$want\ndefine('GM_CF', false);\n"
+    return "<?php\nerror_reporting(0); @set_time_limit(120); @ini_set('memory_limit', '256M');\n$want\n\$cf = false;\n"
         . '$mode = ' . var_export($mode, true) . "; \$body = base64_decode('" . base64_encode($body) . "'); \$in = json_decode(\$body, true) ?: [];\n"
         . "\$webdir = realpath(base64_decode('" . base64_encode((string)$s['ssh_path']) . "')); if (!\$webdir) { echo json_encode(['ok' => 0, 'err' => 'المسار غير موجود']); exit; }\n"
         . '$up = ' . (int)$s['root_up'] . "; \$root = realpath(\$webdir . str_repeat('/..', \$up)); \$tmp = sys_get_temp_dir() . '/gm_' . md5(\$webdir . '/gm-agent.php');\n"
@@ -222,7 +236,7 @@ function site_state(array $s): string {
     $blk = [];
     foreach (q('SELECT ip, expires FROM gm_blocks WHERE site_id IN (0,?) AND (expires IS NULL OR expires>?) ORDER BY ip, id', [$s['id'], now()]) as $b)
         $blk[$b['ip']] = $b['expires'] ? strtotime($b['expires']) : 0;
-    return json_encode(['allow' => allow_ips(), 'block' => (object)$blk, 'lock' => (int)$s['lockdown']]);
+    return json_encode(['allow' => allow_ips(), 'block' => (object)$blk, 'cf' => (int)$s['cf'], 'lock' => (int)$s['lockdown']]);
 }
 function push_state(array $s): bool {
     $body = site_state($s);
@@ -232,6 +246,20 @@ function push_state(array $s): bool {
 }
 function push_all(int $sid = 0): void {
     foreach (q('SELECT * FROM gm_sites WHERE agent_url IS NOT NULL' . ($sid ? ' AND id=' . (int)$sid : ''))->fetchAll() as $s) push_state($s);   // الحارس فقط
+}
+/* زرع ملف الوكيل في المجلد العام للأصل عبر SSH. إن كانت للأصل بصمة ملفات معتمدة نضيف الملف إليها حتى لا يُحسب تغييراً مشبوهاً. */
+function plant_agent(array $s): bool {
+    if (empty($s['ssh_host'])) return false;
+    $j = ssh_call($s, 'install', json_encode(['b64' => base64_encode(agent_code())]));
+    if (!$j || empty($j['done'])) return false;
+    upd($s['id'], ['agent_url' => rtrim(preg_replace('~[?#].*$~', '', $s['url']), '/') . '/gm-agent.php']);
+    act_log($s['id'], 'auto', 'plant', 'زرع ملف الوكيل: ' . ($j['file'] ?? 'gm-agent.php'));
+    if ($s['files_sum_base'] !== null && ($full = ssh_call($s, 'full'))) {
+        $old = unpack_manifest($s['manifest']); $chg = array_keys(array_diff_assoc($full['files'], $old) + array_diff_key($old, $full['files']));
+        if ($chg && !array_filter($chg, fn($p) => !preg_match('~(^|/)gm-agent\.php$~', (string)$p)))
+            upd($s['id'], ['manifest' => pack_manifest($full['files']), 'files_sum_base' => $full['sum'], 'files_sum_last' => $full['sum']]);
+    }
+    return true;
 }
 function quarantine_files(array $s, array $paths, string $actor, string $reason): array {
     $j = agent_call($s, 'quarantine', ['paths' => array_values($paths)]);
@@ -537,20 +565,31 @@ function run_checks(): bool {
         if ($s['agent_url']) $reqs['t' . $s['id']] = agent_req($s, 'stats');
     }
     $res = $reqs ? http_multi($reqs) : [];
+    $sshDue = []; $every = max(5, (int)setting('files_every', 30)) * 60;
     foreach ($sites as $s) {
         try {
             if (isset($res['p' . $s['id']])) {
                 check_page($s, $res['p' . $s['id']]);
                 $s['fail_count'] = (!$res['p' . $s['id']]['err'] && $res['p' . $s['id']]['code'] < 400) ? 0 : 1;
             }
-            if ($s['ssh_host']) {
-                $j = ssh_call($s, 'sum');
-                check_files($s, ['code' => $j ? 200 : 0, 'body' => $j ? json_encode($j) : '', 'err' => $GLOBALS['gm_ssh_err']]);
-            } elseif ($s['agent_url']) check_files($s, $res['a' . $s['id']]);
+            if ($s['ssh_host']) { if (!$s['files_at'] || strtotime($s['files_at']) < time() - $every + 60) $sshDue[] = $s; }
+            elseif ($s['agent_url']) check_files($s, $res['a' . $s['id']]);
             if ($s['agent_url']) check_traffic($s, $res['t' . $s['id']]);
             if (!$s['ssl_checked_at'] || strtotime($s['ssl_checked_at']) < time() - 21600) check_ssl_dns($s);
             upd($s['id'], ['last_check' => now()]);
         } catch (Throwable $e) { if (db()->inTransaction()) db()->rollBack(); error_log('GM site ' . $s['id'] . ': ' . $e->getMessage()); }
+    }
+    // فحص الملفات عبر SSH: الأقدم أولاً، وبميزانية وقت لكل دورة حتى لا تُرهق الاستضافة المشتركة ولا تتأخر التنبيهات
+    usort($sshDue, fn($a, $b) => strcmp((string)$a['files_at'], (string)$b['files_at']));
+    $t0 = time();
+    foreach ($sshDue as $s) {
+        if (time() - $t0 > 150) break;
+        try {
+            if (!$s['agent_url'] && setting('auto_plant') === '1' && plant_agent($s)) $s = site((int)$s['id']) + ['fail_count' => $s['fail_count']];
+            $j = ssh_call($s, 'sum');
+            upd($s['id'], ['files_at' => now()]);
+            check_files($s, ['code' => $j ? 200 : 0, 'body' => $j ? json_encode($j) : '', 'err' => $GLOBALS['gm_ssh_err']]);
+        } catch (Throwable $e) { error_log('GM ssh ' . $s['id'] . ': ' . $e->getMessage()); }
     }
     // مهام ثقيلة: موقع واحد لكل دورة حتى لا تتأخر الفحوص
     try {

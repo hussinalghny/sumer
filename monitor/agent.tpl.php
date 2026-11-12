@@ -1,6 +1,5 @@
 <?php
 /* GHANI Monitor Agent v2 — ارفعه باسم gm-agent.php في المجلد العام للموقع (public_html أو public) */
-defined('GM_CF') || define('GM_CF', false); /*__GM_CF__*/
 
 /* ===== وضع الحارس: عند تضمين الملف (require_once / auto_prepend_file) يسجّل الطلب ويطبّق الحظر والإغلاق ===== */
 if (!isset($_SERVER['SCRIPT_FILENAME']) || realpath($_SERVER['SCRIPT_FILENAME']) !== __FILE__) {
@@ -8,9 +7,9 @@ if (!isset($_SERVER['SCRIPT_FILENAME']) || realpath($_SERVER['SCRIPT_FILENAME'])
         define('GM_SEEN', 1);
         (function () {
             $b = sys_get_temp_dir() . '/gm_' . md5(__FILE__);
-            $ip = preg_replace('~[^0-9a-fA-F:.]~', '', (string)((GM_CF ? ($_SERVER['HTTP_CF_CONNECTING_IP'] ?? null) : null) ?? $_SERVER['REMOTE_ADDR'] ?? ''));
-            $deny = '-';
             $st = @json_decode((string)@file_get_contents($b . '.state'), true);
+            $ip = preg_replace('~[^0-9a-fA-F:.]~', '', (string)((!empty($st['cf']) ? ($_SERVER['HTTP_CF_CONNECTING_IP'] ?? null) : null) ?? $_SERVER['REMOTE_ADDR'] ?? ''));
+            $deny = '-';
             if ($st && !in_array($ip, $st['allow'] ?? [], true)) {
                 $x = $st['block'][$ip] ?? null;
                 if ($x !== null && ($x == 0 || $x > time())) $deny = 'B';
@@ -28,23 +27,25 @@ if (!isset($_SERVER['SCRIPT_FILENAME']) || realpath($_SERVER['SCRIPT_FILENAME'])
     return;
 }
 
-/* ===== وضع الوكيل: طلبات موقّعة من نظام المراقبة فقط ===== */
-const GM_SECRET = '__GM_SECRET__';
-const GM_UP = 0; /*__GM_UP__*/
+/* ===== وضع الوكيل: طلبات موقّعة رقمياً من نظام المراقبة فقط =====
+   الملف نفسه لكل المواقع ولا يحتوي أي سر: فيه المفتاح العام فقط، والتوقيع مربوط باسم نطاق الموقع. */
+const GM_PUBKEY = '__GM_PUBKEY__';
 const GM_WANT = '~(\.(php\d?|phtml|pht|phar|inc|js|html?|cgi|pl|py|sh)(\.|$))|(^|/)(\.htaccess|\.user\.ini|php\.ini)$~i';
 
-$ts = $_SERVER['HTTP_X_GM_TS'] ?? ''; $sig = $_SERVER['HTTP_X_GM_SIG'] ?? '';
+$ts = $_SERVER['HTTP_X_GM_TS'] ?? ''; $opt = $_SERVER['HTTP_X_GM_OPT'] ?? ''; $sig = base64_decode((string)($_SERVER['HTTP_X_GM_SIG'] ?? ''));
 $mode = $_GET['m'] ?? ''; $body = (string)file_get_contents('php://input');
-if (strpos(GM_SECRET, '__') === 0 || !ctype_digit($ts) || abs(time() - (int)$ts) > 300
-    || !hash_equals(hash_hmac('sha256', $ts . '|' . $mode . '|' . sha1($body), GM_SECRET), $sig)) {
+$host = preg_replace('~^www\.~', '', strtolower(preg_replace('~:\d+$~', '', (string)($_SERVER['HTTP_HOST'] ?? ''))));
+if (strpos(GM_PUBKEY, '__') === 0 || !ctype_digit($ts) || abs(time() - (int)$ts) > 300 || !preg_match('~^up=([0-3]);cf=([01])$~', $opt, $om)
+    || !function_exists('openssl_verify') || openssl_verify($ts . '|' . $mode . '|' . sha1($body) . '|' . $opt . '|' . $host, $sig, GM_PUBKEY, OPENSSL_ALGO_SHA256) !== 1) {
     http_response_code(404); exit;
 }
+$up = (int)$om[1]; $cf = (bool)$om[2];
 @set_time_limit(120); @ini_set('memory_limit', '256M');
-$root = realpath(__DIR__ . str_repeat('/..', GM_UP));
+$root = realpath(__DIR__ . str_repeat('/..', $up));
 $in = json_decode($body, true) ?: [];
 $tmp = sys_get_temp_dir() . '/gm_' . md5(__FILE__);
 $qdir = $root . '/.gm-quarantine';
-$webdir = __DIR__; $selfFile = __FILE__; $up = GM_UP;
+$webdir = __DIR__; $selfFile = __FILE__;
 $self = str_replace('\\', '/', substr(__FILE__, strlen($root) + 1));
 header('Content-Type: application/json'); ob_start('ob_gzhandler');
 
@@ -122,7 +123,7 @@ case 'stats':
     $bots = '~sqlmap|nikto|nmap|masscan|wpscan|acunetix|nuclei|dirbuster|gobuster|ffuf|zgrab|hydra|nessus|openvas~i';
     $total = 0; $blocked = 0; $ips = []; $paths = []; $login = []; $atk = []; $hot = []; $rest = [];
     // طلبات نظام المراقبة نفسه لا تُحسب ولا تُصنَّف كهجوم
-    $mon = preg_replace('~[^0-9a-fA-F:.]~', '', (string)((GM_CF ? ($_SERVER['HTTP_CF_CONNECTING_IP'] ?? null) : null) ?? $_SERVER['REMOTE_ADDR'] ?? ''));
+    $mon = preg_replace('~[^0-9a-fA-F:.]~', '', (string)((!empty($cf) ? ($_SERVER['HTTP_CF_CONNECTING_IP'] ?? null) : null) ?? $_SERVER['REMOTE_ADDR'] ?? ''));
     if (@rename($f, $t) || is_file($t)) {
         $fh = fopen($t, 'r');
         while ($fh && ($l = fgets($fh)) !== false) {
@@ -148,6 +149,11 @@ case 'stats':
     gm_out(['total' => $total, 'blocked' => $blocked, 'uniq' => count($ips), 'ips' => array_slice($ips, 0, 10, true),
         'paths' => array_slice($paths, 0, 10, true), 'login' => array_slice($login, 0, 5, true), 'atk' => array_slice($atk, 0, 20, true),
         'rows' => array_merge($hot, $rest), 'sh' => is_file($tmp . '.state') ? md5((string)file_get_contents($tmp . '.state')) : '']);
+
+case 'install':                                   // زرع/تحديث ملف الوكيل نفسه (عبر SSH أو لتحديث نسخة قديمة)
+    $code = (string)base64_decode((string)($in['b64'] ?? ''));
+    if (strlen($code) < 2000 || strpos($code, 'GM_PUBKEY') === false || strpos($code, '<?php') !== 0) gm_out(['done' => 0]);
+    gm_out(['done' => (int)(@file_put_contents($selfFile, $code, LOCK_EX) !== false), 'file' => $self]);
 
 case 'setstate':
     if (!is_array(json_decode($body, true))) gm_out(['sh' => '']);

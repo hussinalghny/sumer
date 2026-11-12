@@ -437,11 +437,12 @@ if (!$ev): ?><div class="empty">لا توجد أحداث بعد</div><?php else:
 <?php else: ?>
 <section class="pn"><h2>الاتصال بالأصل</h2><div class="pb">
 <?php if ($s['ssh_host']): ?><p>الملفات تُفحص عبر SSH: <span class="mono"><?= h($s['ssh_user'] . '@' . $s['ssh_host'] . ':' . $s['ssh_port']) ?></span> على المسار <span class="mono"><?= h($s['ssh_path']) ?></span></p><p><?= f('sshtest', 'اختبار اتصال SSH', ['id' => $id], 'pri') ?></p><?php endif ?>
-<?php if ($s['agent_url']): ?><p>1. نزّل ملف الوكيل الخاص بهذا الأصل وارفعه إلى المجلد العام باسم <code>gm-agent.php</code>.</p><p><a class="btn pri" href="?agent=<?= $id ?>">تنزيل gm-agent.php</a></p>
+<?php if ($s['agent_url']): ?><p>1. نزّل ملف الوكيل (نفس الملف لكل المواقع) وارفعه إلى المجلد العام باسم <code>gm-agent.php</code>.</p><p><a class="btn pri" href="?agent=<?= $id ?>">تنزيل gm-agent.php</a></p>
 <p>2. اربط الحارس حتى يعمل عدّ الطلبات وكشف الهجمات والحظر والإغلاق الطارئ:</p>
 <p><b>Laravel:</b> بعد <code>&lt;?php</code> في <code>public/index.php</code> أضف <code>require_once __DIR__.'/gm-agent.php';</code></p>
 <p><b>PHP عادي:</b> نفس السطر أعلى <code>index.php</code>، أو في <code>.user.ini</code>: <code>auto_prepend_file = "/المسار/الكامل/gm-agent.php"</code></p>
 <p class="mut">بعد التعديل يصلك تنبيه «تغيير في الملفات» مرة واحدة. اعتمده من تبويب الملفات.</p><?php endif ?>
+<?php if (!$s['agent_url']): ?><p>الحارس غير مفعّل لهذا الأصل: لا يوجد عدّ للطلبات ولا كشف هجمات ولا حظر ولا إغلاق طارئ.</p><p><?= f('mkagent', 'تفعيل ملف الحارس', ['id' => $id]) ?></p><?php endif ?>
 <?php if (!has_agent($s)): ?><p class="mut">هذا الأصل يُراقَب من الخارج فقط. احذفه وأضفه من جديد مع تفعيل الوكيل أو SSH لتفعيل فحص الملفات.</p><?php endif ?></div></section>
 <section class="pn"><h2>منطقة الخطر</h2><div class="pb acts"><?= f('del', 'حذف الأصل وكل سجلاته', ['id' => $id], 'dng', 'حذف الموقع وكل سجلاته من المراقبة؟') ?></div></section>
 <?php endif;
@@ -504,12 +505,14 @@ function view_settings(): void { $v = fn($k, $d) => (int)setting($k, $d); ?>
 <section class="pn"><h2>سياسة الكشف والاستجابة</h2><div class="pb"><form method="post"><?= csrf_in() ?><input type="hidden" name="act" value="policy">
 <label class="ck"><input type="checkbox" name="auto_block" <?= setting('auto_block') === '1' ? 'checked' : '' ?>> حظر تلقائي لأي عنوان يهاجم أو يجرّب كلمات السر أو يغرق الموقع</label>
 <label class="ck"><input type="checkbox" name="auto_quarantine" <?= setting('auto_quarantine') === '1' ? 'checked' : '' ?>> عزل تلقائي للملفات الجديدة التي تحمل توقيعاً خبيثاً مؤكداً</label>
+<label class="ck"><input type="checkbox" name="auto_plant" <?= setting('auto_plant') === '1' ? 'checked' : '' ?>> زرع ملف الوكيل تلقائياً في كل الأصول المربوطة بـ SSH</label>
 <label>مدة الحظر التلقائي (ساعات)</label><input type="text" name="block_hours" value="<?= $v('block_hours', 24) ?>" dir="ltr">
 <label>عناوين مستثناة من الحظر والإغلاق، واحد بكل سطر. عنوانك الحالي: <span class="mono"><?= h($_SERVER['REMOTE_ADDR'] ?? '') ?></span></label><textarea name="allow_ips" rows="3" dir="ltr"><?= h(setting('allow_ips', '')) ?></textarea>
 <label>تنبيه هجوم: طلبات هجومية من عنوان واحد خلال 5 دقائق</label><input type="text" name="atk_min" value="<?= $v('atk_min', 5) ?>" dir="ltr">
 <label>تنبيه إغراق: إجمالي طلبات الأصل خلال 5 دقائق (ويكون 4 أضعاف المعدل)</label><input type="text" name="rq_min" value="<?= $v('rq_min', 500) ?>" dir="ltr">
 <label>طلبات من عنوان واحد خلال 5 دقائق</label><input type="text" name="ip_max" value="<?= $v('ip_max', 300) ?>" dir="ltr">
 <label>محاولات دخول من عنوان واحد خلال 5 دقائق</label><input type="text" name="login_max" value="<?= $v('login_max', 20) ?>" dir="ltr">
+<label>فحص ملفات الأصول المربوطة بـ SSH كل (دقائق). التوقف والتشويه يُفحصان كل 5 دقائق دائماً</label><input type="text" name="files_every" value="<?= $v('files_every', 30) ?>" dir="ltr">
 <label>مدة حفظ سجل الطلبات (أيام)</label><input type="text" name="keep_days" value="<?= $v('keep_days', 7) ?>" dir="ltr">
 <p><button class="btn pri">حفظ السياسة</button></p></form></div></section>
 <div>
@@ -517,6 +520,8 @@ function view_settings(): void { $v = fn($k, $d) => (int)setting($k, $d); ?>
 <label>Bot Token من @BotFather</label><input type="text" name="tg_token" value="<?= h(setting('tg_token', '')) ?>" dir="ltr">
 <label>Chat ID (رقمك أو رقم الكروب)</label><input type="text" name="tg_chat" value="<?= h(setting('tg_chat', '')) ?>" dir="ltr">
 <p><button class="btn pri">حفظ وإرسال تجربة</button></p></form></div></section>
+<section class="pn"><h2>ملف الوكيل الموحّد</h2><div class="pb"><p>ملف واحد لكل مواقعك. لا يحتوي أي سر، ويستجيب فقط لطلبات موقّعة من هذه اللوحة.</p><p><a class="btn pri" href="?agent=0">تنزيل gm-agent.php</a></p>
+<p class="mut">ارفعه إلى المجلد العام لكل موقع، أو فعّل «زرع ملف الوكيل تلقائياً» ليُزرع عبر SSH.</p></div></section>
 <?php $pk = ssh_pubkey(); ?><section class="pn"><h2>مفتاح SSH للمراقب</h2><div class="pb">
 <?php if ($pk): ?><p>أضف هذا المفتاح العام إلى SSH Keys في لوحة كل استضافة تريد ربطها:</p><textarea rows="3" dir="ltr" readonly onclick="this.select()"><?= h($pk) ?></textarea>
 <p class="mut">المفتاح الخاص محفوظ في <span class="mono"><?= h(ssh_key_path()) ?></span>. من يملكه يدخل كل استضافاتك.</p>

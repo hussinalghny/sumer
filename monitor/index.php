@@ -58,10 +58,7 @@ if (empty($_SESSION['in'])) {
 
 /* ---------- تنزيل الوكيل ---------- */
 if (isset($_GET['agent'])) {
-    $s = site((int)$_GET['agent']) ?: exit('not found');
-    $code = strtr(file_get_contents(__DIR__ . '/agent.tpl.php'), ['__GM_SECRET__' => $s['secret'],
-        'GM_UP = 0; /*__GM_UP__*/' => 'GM_UP = ' . (int)$s['root_up'] . ';',
-        "define('GM_CF', false); /*__GM_CF__*/" => "define('GM_CF', " . ($s['cf'] ? 'true' : 'false') . ');']);
+    $code = agent_code();          // ملف واحد لكل المواقع: لا يحتوي أسراراً
     header('Content-Type: application/octet-stream'); header('Content-Disposition: attachment; filename="gm-agent.php"');
     exit($code);
 }
@@ -96,12 +93,15 @@ switch ($act) {
             $sh = trim((string)($r['ssh_host'] ?? '')); $su = trim((string)($r['ssh_user'] ?? '')); $sp = rtrim(trim((string)($r['path'] ?? '')), '/');
             if ($sh !== '' && (!preg_match('~^[a-z0-9][a-z0-9._-]*$~i', $sh) || !preg_match('~^[a-z_][a-z0-9._-]*$~i', $su) || $sp === '' || $sp[0] !== '/')) $sh = '';
             q('INSERT INTO gm_sites (name,url,keyword,deface_check,agent_url,secret,root_up,cf,ssh_host,ssh_port,ssh_user,ssh_path,created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)',
-                [mb_substr(trim((string)($r['name'] ?? '')) ?: host_of($url), 0, 120), $url, '', 1, rtrim(preg_replace('~[?#].*$~', '', $url), '/') . '/gm-agent.php', bin2hex(random_bytes(24)),
-                 (int)!empty($r['laravel']), (int)!empty($r['cloudflare']), $sh ?: null, max(1, (int)($r['ssh_port'] ?? 22)), $sh ? $su : null, $sh ? $sp : null, now()]);
+                [mb_substr(trim((string)($r['name'] ?? '')) ?: host_of($url), 0, 120), $url, '', 1, ($sh && empty($r['guard'])) ? null : rtrim(preg_replace('~[?#].*$~', '', $url), '/') . '/gm-agent.php', bin2hex(random_bytes(24)),
+                 (int)!empty($r['laravel']), (int)!empty($r['cloudflare']), $sh ?: null, (int)($r['ssh_port'] ?? 0) ?: 65002, $sh ? $su : null, $sh ? $sp : null, now()]);
             $have[] = host_of($url); $add++;
         }
         act_log(0, 'admin', 'import', "استيراد جماعي: $add أصل جديد، $dup مكرر، $bad غير صالح");
         back("أُضيف {$add} أصل. مكرر: {$dup}، غير صالح: {$bad}", '?v=assets');
+    case 'mkagent':
+        if ($S && !$S['agent_url']) { upd($sid, ['agent_url' => rtrim(preg_replace('~[?#].*$~', '', $S['url']), '/') . '/gm-agent.php']); act_log($sid, 'admin', 'guard', 'تفعيل ملف الحارس'); }
+        back('تم — نزّل ملف الحارس وارفعه للموقع');
     case 'sshtest':
         if ($S && $S['ssh_host']) { $j = ssh_call($S, 'sum'); back($j ? '✅ الاتصال ناجح — ' . (int)$j['count'] . ' ملف كود' : '❌ فشل: ' . $GLOBALS['gm_ssh_err']); }
         back();
@@ -172,8 +172,8 @@ switch ($act) {
         set_setting('tg_token', trim((string)$_POST['tg_token'])); set_setting('tg_chat', trim((string)$_POST['tg_chat']));
         back(tg("✅ <b>GHANI Monitor</b>\nتم ربط التنبيهات بنجاح") ? 'تم الحفظ ووصلتك رسالة تجربة على تيليگرام' : 'تم الحفظ لكن فشل إرسال رسالة التجربة — تأكد من التوكن و Chat ID');
     case 'policy':
-        foreach (['rq_min', 'ip_max', 'login_max', 'atk_min', 'block_hours', 'keep_days'] as $k) set_setting($k, (string)max(1, (int)($_POST[$k] ?? 0)));
-        foreach (['auto_block', 'auto_quarantine'] as $k) set_setting($k, empty($_POST[$k]) ? '0' : '1');
+        foreach (['rq_min', 'ip_max', 'login_max', 'atk_min', 'block_hours', 'keep_days', 'files_every'] as $k) set_setting($k, (string)max(1, (int)($_POST[$k] ?? 0)));
+        foreach (['auto_block', 'auto_quarantine', 'auto_plant'] as $k) set_setting($k, empty($_POST[$k]) ? '0' : '1');
         set_setting('allow_ips', trim((string)($_POST['allow_ips'] ?? '')));
         act_log(0, 'admin', 'policy', 'تعديل سياسة الاستجابة: حظر تلقائي=' . setting('auto_block') . '، عزل تلقائي=' . setting('auto_quarantine'));
         push_all(); back('تم حفظ السياسة');
