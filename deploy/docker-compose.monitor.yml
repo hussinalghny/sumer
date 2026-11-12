@@ -38,6 +38,7 @@ services:
     volumes:
       - /etc/sumer-certs-monitor:/etc/nginx/certs-monitor:ro
       - ./deploy/nginx-monitor.conf:/etc/nginx/conf.d/monitor.conf:ro
+      - /etc/sumer-monitor-acl:/etc/nginx/monitor-acl:ro
     depends_on: [monitor]
 
 volumes: { monitordb: {}, monitorkeys: {} }

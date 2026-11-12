@@ -24,6 +24,7 @@ if [ ! -d "/etc/letsencrypt/live/$MDOMAIN" ]; then
   certbot certonly --webroot -w /var/www/certbot -d "$MDOMAIN" -m "$EMAIL" --agree-tos -n
 fi
 install -d -m 700 /etc/sumer-certs-monitor
+install -d -m 755 /etc/sumer-monitor-acl
 cp -L "/etc/letsencrypt/live/$MDOMAIN/fullchain.pem" "/etc/letsencrypt/live/$MDOMAIN/privkey.pem" /etc/sumer-certs-monitor/
 chmod 600 /etc/sumer-certs-monitor/*.pem
 cat > /etc/letsencrypt/renewal-hooks/deploy/sumer-monitor.sh <<HOOK
@@ -43,4 +44,4 @@ $COMPOSE up -d --force-recreate nginx
 echo
 echo "✅ افتح: https://$MDOMAIN"
 echo "   مفتاح الإعداد الأول (CRON_KEY): $(grep '^MONITOR_CRON_KEY=' .env | cut -d= -f2)"
-echo "   بعدها: احصر اللوحة بـ IP مالتك في deploy/nginx-monitor.conf ثم: $COMPOSE restart nginx"
+echo "   بعدها احصر اللوحة بعنوانك: bash deploy/monitor-acl.sh YOUR_IP"
