@@ -1,0 +1,4 @@
+Options -Indexes
+<FilesMatch "^(config|lib|views|agent\.tpl)\.php$">
+  Require all denied
+</FilesMatch>
